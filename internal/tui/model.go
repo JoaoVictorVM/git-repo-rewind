@@ -2,6 +2,7 @@ package tui
 
 import (
 	"fmt"
+	"math"
 	"strings"
 	"time"
 
@@ -11,6 +12,8 @@ import (
 	"github.com/JoaoVictorVM/git-repo-rewind/internal/engine"
 	"github.com/JoaoVictorVM/git-repo-rewind/internal/extract"
 )
+
+var minimapRamp = []rune("▁▂▃▄▅▆▇█")
 
 type Model struct {
 	engine *engine.Engine
@@ -89,7 +92,86 @@ func (m Model) renderBody(height int) string {
 func (m Model) renderFooter() string {
 	hints := lipgloss.NewStyle().Faint(true).Render("q sair")
 	summary := fmt.Sprintf("%d commits · %s", m.meta.TotalCommits, rangeLabel(m.meta))
-	return lipgloss.JoinVertical(lipgloss.Left, rule(m.width), spread(hints, summary, m.width))
+	return lipgloss.JoinVertical(lipgloss.Left,
+		rule(m.width),
+		m.renderMinimap(m.width),
+		spread(hints, summary, m.width),
+	)
+}
+
+func (m Model) renderMinimap(width int) string {
+	if width < 1 {
+		return ""
+	}
+	if m.meta.TotalCommits == 0 {
+		return lipgloss.NewStyle().Faint(true).Render(strings.Repeat("·", width))
+	}
+
+	counts := m.bucketCounts(width)
+	peak := 0
+	for _, count := range counts {
+		if count > peak {
+			peak = count
+		}
+	}
+
+	cells := make([]rune, width)
+	for i, count := range counts {
+		cells[i] = spark(count, peak)
+	}
+
+	col := cursorColumn(m.cursor, m.meta.FirstCommit, m.meta.LastCommit, width)
+	marker := lipgloss.NewStyle().Reverse(true).Render(string(cells[col]))
+	return string(cells[:col]) + marker + string(cells[col+1:])
+}
+
+func (m Model) bucketCounts(width int) []int {
+	counts := make([]int, width)
+	span := m.meta.LastCommit.Sub(m.meta.FirstCommit)
+	if span <= 0 {
+		counts[width-1] = m.meta.TotalCommits
+		return counts
+	}
+
+	previous := 0
+	for i := 0; i < width; i++ {
+		frac := float64(i+1) / float64(width)
+		boundary := m.meta.FirstCommit.Add(time.Duration(float64(span) * frac))
+		total := m.engine.At(boundary).CommitCount
+		counts[i] = total - previous
+		previous = total
+	}
+	return counts
+}
+
+func cursorColumn(cursor, first, last time.Time, width int) int {
+	if width <= 1 {
+		return 0
+	}
+	span := last.Sub(first)
+	if span <= 0 {
+		return width - 1
+	}
+	frac := float64(cursor.Sub(first)) / float64(span)
+	frac = math.Max(0, math.Min(1, frac))
+	return int(math.Round(frac * float64(width-1)))
+}
+
+func spark(count, peak int) rune {
+	if count <= 0 {
+		return ' '
+	}
+	if peak <= 0 {
+		return minimapRamp[0]
+	}
+	idx := (count*len(minimapRamp) + peak - 1) / peak
+	if idx < 1 {
+		idx = 1
+	}
+	if idx > len(minimapRamp) {
+		idx = len(minimapRamp)
+	}
+	return minimapRamp[idx-1]
 }
 
 func repoLabel(meta extract.RepoMeta) string {

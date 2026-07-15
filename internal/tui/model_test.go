@@ -7,6 +7,7 @@ import (
 	"time"
 
 	tea "github.com/charmbracelet/bubbletea"
+	"github.com/charmbracelet/lipgloss"
 
 	"github.com/JoaoVictorVM/git-repo-rewind/internal/engine"
 	"github.com/JoaoVictorVM/git-repo-rewind/internal/extract"
@@ -81,6 +82,15 @@ func TestViewFillsTerminalHeight(t *testing.T) {
 	view := sized(buildModel(t, demoSource())).View()
 	if got := strings.Count(view, "\n") + 1; got != 24 {
 		t.Errorf("view tem %d linhas, quer 24", got)
+	}
+}
+
+func TestMinimapSpansFullWidth(t *testing.T) {
+	view := sized(buildModel(t, demoSource())).View()
+	lines := strings.Split(view, "\n")
+	minimap := lines[len(lines)-2]
+	if got := lipgloss.Width(minimap); got != 80 {
+		t.Errorf("largura do minimapa = %d, quer 80\nlinha: %q", got, minimap)
 	}
 }
 
