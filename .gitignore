@@ -1,0 +1,33 @@
+# Binários compilados
+/rewind
+/rewind.exe
+/dist/
+*.exe
+*.out
+*.test
+
+# Cobertura e profiling de testes
+*.cov
+coverage.*
+*.prof
+
+# Cache/artefatos de ferramentas Go
+/vendor/
+go.work
+go.work.sum
+
+# Config local do projeto (stretch: temas em ~/.config, cache em disco)
+*.local.toml
+
+# Arquivos de sistema operacional
+.DS_Store
+Thumbs.db
+
+# Editores e IDEs
+.idea/
+.vscode/
+*.swp
+*~
+
+PRD.md
+CLAUDE.md
