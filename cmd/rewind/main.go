@@ -1,9 +1,16 @@
 package main
 
 import (
+	"context"
 	"flag"
 	"fmt"
 	"os"
+
+	tea "github.com/charmbracelet/bubbletea"
+
+	"github.com/JoaoVictorVM/git-repo-rewind/internal/engine"
+	"github.com/JoaoVictorVM/git-repo-rewind/internal/extract"
+	"github.com/JoaoVictorVM/git-repo-rewind/internal/tui"
 )
 
 const appName = "rewind"
@@ -35,16 +42,17 @@ func run(args []string) error {
 		target = arg
 	}
 
-	repo, err := detectRepo(target)
+	extractor, err := extract.NewGitExtractor(target)
 	if err != nil {
 		return err
 	}
 
-	fmt.Printf("%s: repositorio detectado em %s\n", appName, repo.Root)
-	if repo.Branch != "" {
-		fmt.Printf("branch atual: %s\n", repo.Branch)
-	} else {
-		fmt.Println("branch atual: (sem commits ainda)")
+	eng, err := engine.Build(context.Background(), extractor)
+	if err != nil {
+		return err
 	}
-	return nil
+
+	program := tea.NewProgram(tui.New(eng), tea.WithAltScreen())
+	_, err = program.Run()
+	return err
 }
