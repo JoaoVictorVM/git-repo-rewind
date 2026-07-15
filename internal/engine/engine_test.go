@@ -108,6 +108,77 @@ func TestEmptyEngine(t *testing.T) {
 	}
 }
 
+func TestSeriesBucketsDeltas(t *testing.T) {
+	src := fakeSource{
+		events: []extract.Event{
+			extract.CommitEvent{Timestamp: day(1), Hash: "c1", LinesAdded: 10, LinesDeleted: 1},
+			extract.CommitEvent{Timestamp: day(2), Hash: "c2", LinesAdded: 5, LinesDeleted: 2},
+			extract.CommitEvent{Timestamp: day(3), Hash: "c3", LinesAdded: 3, LinesDeleted: 3},
+		},
+	}
+	engine := buildEngine(t, src)
+
+	got := engine.Series(day(1), day(3), 3)
+	want := []Bucket{
+		{Added: 10, Deleted: 1, Commits: 1},
+		{Added: 5, Deleted: 2, Commits: 1},
+		{Added: 3, Deleted: 3, Commits: 1},
+	}
+	if len(got) != len(want) {
+		t.Fatalf("Series retornou %d buckets, quer %d", len(got), len(want))
+	}
+	for i := range want {
+		if got[i] != want[i] {
+			t.Errorf("bucket %d = %+v, quer %+v", i, got[i], want[i])
+		}
+	}
+}
+
+func TestSeriesIncludesBoundaryCommits(t *testing.T) {
+	src := fakeSource{
+		events: []extract.Event{
+			extract.CommitEvent{Timestamp: day(1), Hash: "c1", LinesAdded: 4},
+			extract.CommitEvent{Timestamp: day(2), Hash: "c2", LinesAdded: 6},
+		},
+	}
+	engine := buildEngine(t, src)
+
+	got := engine.Series(day(1), day(2), 1)
+	if len(got) != 1 || got[0].Added != 10 || got[0].Commits != 2 {
+		t.Errorf("bucket unico = %+v, quer {Added:10 Commits:2}", got[0])
+	}
+}
+
+func TestLogReturnsRecentFirst(t *testing.T) {
+	src := fakeSource{
+		events: []extract.Event{
+			extract.CommitEvent{Timestamp: day(1), Hash: "c1"},
+			extract.CommitEvent{Timestamp: day(2), Hash: "c2"},
+			extract.CommitEvent{Timestamp: day(3), Hash: "c3"},
+		},
+	}
+	engine := buildEngine(t, src)
+
+	got := engine.Log(day(3), 2)
+	if len(got) != 2 || got[0].Hash != "c3" || got[1].Hash != "c2" {
+		t.Errorf("Log(day3, 2) = %v, quer [c3 c2]", hashes(got))
+	}
+	if before := engine.Log(day(1).Add(-time.Hour), 5); len(before) != 0 {
+		t.Errorf("Log antes do primeiro deveria ser vazio, obteve %v", hashes(before))
+	}
+	if none := engine.Log(day(3), 0); none != nil {
+		t.Errorf("Log com limite 0 deveria ser nil, obteve %v", hashes(none))
+	}
+}
+
+func hashes(commits []extract.CommitEvent) []string {
+	out := make([]string, len(commits))
+	for i, c := range commits {
+		out[i] = c.Hash
+	}
+	return out
+}
+
 func TestMetaPassthrough(t *testing.T) {
 	meta := extract.RepoMeta{Name: "demo", DefaultBranch: "main", TotalCommits: 1, FirstCommit: day(1), LastCommit: day(1)}
 	src := fakeSource{

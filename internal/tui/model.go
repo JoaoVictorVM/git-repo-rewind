@@ -11,6 +11,7 @@ import (
 
 	"github.com/JoaoVictorVM/git-repo-rewind/internal/engine"
 	"github.com/JoaoVictorVM/git-repo-rewind/internal/extract"
+	"github.com/JoaoVictorVM/git-repo-rewind/internal/tui/scenes"
 )
 
 var minimapRamp = []rune("▁▂▃▄▅▆▇█")
@@ -76,17 +77,14 @@ func (m Model) renderBody(height int) string {
 	if height < 1 {
 		height = 1
 	}
-	content := "repositorio sem commits ainda"
-	if m.meta.TotalCommits > 0 {
-		state := m.engine.At(m.cursor)
-		content = fmt.Sprintf("%d commits até o cursor\n+%d   −%d linhas",
-			state.CommitCount, state.LinesAdded, state.LinesDeleted)
+	if m.meta.TotalCommits == 0 {
+		return lipgloss.NewStyle().
+			Width(m.width).
+			Height(height).
+			Align(lipgloss.Center, lipgloss.Center).
+			Render("repositorio sem commits ainda")
 	}
-	return lipgloss.NewStyle().
-		Width(m.width).
-		Height(height).
-		Align(lipgloss.Center, lipgloss.Center).
-		Render(content)
+	return scenes.Timeline{}.Render(m.engine, m.cursor, m.width, height)
 }
 
 func (m Model) renderFooter() string {

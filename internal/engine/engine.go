@@ -15,7 +15,14 @@ type WorldState struct {
 	CommitCount  int
 }
 
+type Bucket struct {
+	Added   int
+	Deleted int
+	Commits int
+}
+
 type Engine struct {
+	commits    []extract.CommitEvent
 	timestamps []time.Time
 	addPrefix  []int
 	delPrefix  []int
@@ -43,15 +50,58 @@ func Build(ctx context.Context, src extract.EventSource) (*Engine, error) {
 }
 
 func (e *Engine) At(cursor time.Time) WorldState {
-	count := sort.Search(len(e.timestamps), func(i int) bool {
-		return e.timestamps[i].After(cursor)
-	})
+	count := upperBound(e.timestamps, cursor)
 	return WorldState{
 		Cursor:       cursor,
 		LinesAdded:   e.addPrefix[count],
 		LinesDeleted: e.delPrefix[count],
 		CommitCount:  count,
 	}
+}
+
+func (e *Engine) Series(from, to time.Time, buckets int) []Bucket {
+	if buckets <= 0 {
+		return nil
+	}
+
+	series := make([]Bucket, buckets)
+	span := to.Sub(from)
+	previous := lowerBound(e.timestamps, from)
+
+	for i := 0; i < buckets; i++ {
+		boundary := to
+		if span > 0 && i < buckets-1 {
+			frac := float64(i+1) / float64(buckets)
+			boundary = from.Add(time.Duration(float64(span) * frac))
+		}
+
+		next := upperBound(e.timestamps, boundary)
+		series[i] = Bucket{
+			Added:   e.addPrefix[next] - e.addPrefix[previous],
+			Deleted: e.delPrefix[next] - e.delPrefix[previous],
+			Commits: next - previous,
+		}
+		previous = next
+	}
+	return series
+}
+
+func (e *Engine) Log(cursor time.Time, limit int) []extract.CommitEvent {
+	if limit <= 0 {
+		return nil
+	}
+
+	end := upperBound(e.timestamps, cursor)
+	start := end - limit
+	if start < 0 {
+		start = 0
+	}
+
+	recent := make([]extract.CommitEvent, 0, end-start)
+	for i := end - 1; i >= start; i-- {
+		recent = append(recent, e.commits[i])
+	}
+	return recent
 }
 
 func (e *Engine) Meta() extract.RepoMeta {
@@ -61,6 +111,7 @@ func (e *Engine) Meta() extract.RepoMeta {
 func newEngine(commits []extract.CommitEvent, meta extract.RepoMeta) *Engine {
 	n := len(commits)
 	engine := &Engine{
+		commits:    commits,
 		timestamps: make([]time.Time, n),
 		addPrefix:  make([]int, n+1),
 		delPrefix:  make([]int, n+1),
@@ -80,5 +131,17 @@ func sortChronologically(commits []extract.CommitEvent) {
 			return commits[i].Hash < commits[j].Hash
 		}
 		return commits[i].Timestamp.Before(commits[j].Timestamp)
+	})
+}
+
+func upperBound(timestamps []time.Time, t time.Time) int {
+	return sort.Search(len(timestamps), func(i int) bool {
+		return timestamps[i].After(t)
+	})
+}
+
+func lowerBound(timestamps []time.Time, t time.Time) int {
+	return sort.Search(len(timestamps), func(i int) bool {
+		return !timestamps[i].Before(t)
 	})
 }
