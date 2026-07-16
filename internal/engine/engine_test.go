@@ -206,6 +206,51 @@ func TestNextAndPrevStepByCommit(t *testing.T) {
 	}
 }
 
+func TestGranularityCoarserFiner(t *testing.T) {
+	if got := ByCommit.Coarser(); got != ByDay {
+		t.Errorf("Coarser(commit) = %v, quer dia", got.Label())
+	}
+	if got := ByDay.Coarser(); got != ByWeek {
+		t.Errorf("Coarser(dia) = %v, quer semana", got.Label())
+	}
+	if got := ByWeek.Coarser(); got != ByWeek {
+		t.Errorf("Coarser(semana) deveria travar em semana, obteve %v", got.Label())
+	}
+	if got := ByWeek.Finer(); got != ByDay {
+		t.Errorf("Finer(semana) = %v, quer dia", got.Label())
+	}
+	if got := ByCommit.Finer(); got != ByCommit {
+		t.Errorf("Finer(commit) deveria travar em commit, obteve %v", got.Label())
+	}
+}
+
+func TestStepByGranularity(t *testing.T) {
+	src := fakeSource{
+		events: []extract.Event{
+			extract.CommitEvent{Timestamp: day(1), Hash: "c1"},
+			extract.CommitEvent{Timestamp: day(10), Hash: "c2"},
+			extract.CommitEvent{Timestamp: day(20), Hash: "c3"},
+		},
+	}
+	engine := buildEngine(t, src)
+
+	if got := engine.Step(day(1), ByCommit, true); !got.Equal(day(10)) {
+		t.Errorf("passo commit para frente = %v, quer day10", got)
+	}
+	if got := engine.Step(day(10), ByDay, true); !got.Equal(day(11)) {
+		t.Errorf("passo dia para frente = %v, quer day11", got)
+	}
+	if got := engine.Step(day(10), ByWeek, false); !got.Equal(day(3)) {
+		t.Errorf("passo semana para tras = %v, quer day3", got)
+	}
+	if got := engine.Step(day(20), ByWeek, true); !got.Equal(day(20)) {
+		t.Errorf("passo alem do fim deveria clampar em day20, obteve %v", got)
+	}
+	if got := engine.Step(day(1), ByDay, false); !got.Equal(day(1)) {
+		t.Errorf("passo antes do inicio deveria clampar em day1, obteve %v", got)
+	}
+}
+
 func TestNextPrevEmptyEngine(t *testing.T) {
 	engine := buildEngine(t, fakeSource{})
 	cursor := day(5)

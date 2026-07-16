@@ -104,6 +104,75 @@ func (e *Engine) Log(cursor time.Time, limit int) []extract.CommitEvent {
 	return recent
 }
 
+type Granularity int
+
+const (
+	ByCommit Granularity = iota
+	ByDay
+	ByWeek
+)
+
+func (g Granularity) Label() string {
+	switch g {
+	case ByDay:
+		return "dia"
+	case ByWeek:
+		return "semana"
+	default:
+		return "commit"
+	}
+}
+
+func (g Granularity) Coarser() Granularity {
+	if g < ByWeek {
+		return g + 1
+	}
+	return g
+}
+
+func (g Granularity) Finer() Granularity {
+	if g > ByCommit {
+		return g - 1
+	}
+	return g
+}
+
+func (e *Engine) Step(cursor time.Time, granularity Granularity, forward bool) time.Time {
+	switch granularity {
+	case ByDay:
+		return e.clampToHistory(shiftDays(cursor, 1, forward))
+	case ByWeek:
+		return e.clampToHistory(shiftDays(cursor, 7, forward))
+	default:
+		if forward {
+			return e.Next(cursor)
+		}
+		return e.Prev(cursor)
+	}
+}
+
+func (e *Engine) clampToHistory(t time.Time) time.Time {
+	if len(e.timestamps) == 0 {
+		return t
+	}
+	first := e.timestamps[0]
+	last := e.timestamps[len(e.timestamps)-1]
+	if t.Before(first) {
+		return first
+	}
+	if t.After(last) {
+		return last
+	}
+	return t
+}
+
+func shiftDays(cursor time.Time, days int, forward bool) time.Time {
+	if !forward {
+		days = -days
+	}
+	return cursor.AddDate(0, 0, days)
+}
+
 func (e *Engine) Next(cursor time.Time) time.Time {
 	idx := upperBound(e.timestamps, cursor)
 	if idx < len(e.timestamps) {

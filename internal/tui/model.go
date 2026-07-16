@@ -22,6 +22,7 @@ type Model struct {
 	cursor      time.Time
 	width       int
 	height      int
+	granularity engine.Granularity
 	addedAnim   counterAnim
 	deletedAnim counterAnim
 	animating   bool
@@ -58,13 +59,19 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		case "q", "ctrl+c":
 			return m, tea.Quit
 		case "l", "right":
-			return m.moveCursor(m.engine.Next(m.cursor))
+			return m.moveCursor(m.engine.Step(m.cursor, m.granularity, true))
 		case "h", "left":
-			return m.moveCursor(m.engine.Prev(m.cursor))
+			return m.moveCursor(m.engine.Step(m.cursor, m.granularity, false))
 		case "g":
 			return m.moveCursor(m.meta.FirstCommit)
 		case "G":
 			return m.moveCursor(m.meta.LastCommit)
+		case "+", "=":
+			m.granularity = m.granularity.Coarser()
+			return m, nil
+		case "-", "_":
+			m.granularity = m.granularity.Finer()
+			return m, nil
 		}
 	}
 	return m, nil
@@ -123,7 +130,7 @@ func (m Model) renderHeader() string {
 	}
 
 	title := lipgloss.NewStyle().Bold(true).Render("rewind · " + repoLabel(m.meta))
-	info := fmt.Sprintf("branch %s · cursor %s", branch, date)
+	info := fmt.Sprintf("branch %s · cursor %s · passo %s", branch, date, m.granularity.Label())
 	bar := spread(title, info, m.width)
 	return lipgloss.JoinVertical(lipgloss.Left, bar, rule(m.width))
 }
@@ -148,7 +155,7 @@ func (m Model) renderBody(height int) string {
 }
 
 func (m Model) renderFooter() string {
-	hints := lipgloss.NewStyle().Faint(true).Render("h/l mover · g/G inicio/fim · q sair")
+	hints := lipgloss.NewStyle().Faint(true).Render("h/l mover · +/- passo · g/G inicio/fim · q sair")
 	summary := fmt.Sprintf("%d commits · %s", m.meta.TotalCommits, rangeLabel(m.meta))
 	return lipgloss.JoinVertical(lipgloss.Left,
 		rule(m.width),
