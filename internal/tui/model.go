@@ -57,7 +57,27 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		switch msg.String() {
 		case "q", "ctrl+c":
 			return m, tea.Quit
+		case "l", "right":
+			return m.moveCursor(m.engine.Next(m.cursor))
+		case "h", "left":
+			return m.moveCursor(m.engine.Prev(m.cursor))
+		case "g":
+			return m.moveCursor(m.meta.FirstCommit)
+		case "G":
+			return m.moveCursor(m.meta.LastCommit)
 		}
+	}
+	return m, nil
+}
+
+func (m Model) moveCursor(to time.Time) (tea.Model, tea.Cmd) {
+	if to.Equal(m.cursor) {
+		return m, nil
+	}
+	m.cursor = to
+	if !m.animating {
+		m.animating = true
+		return m, tick()
 	}
 	return m, nil
 }
@@ -128,7 +148,7 @@ func (m Model) renderBody(height int) string {
 }
 
 func (m Model) renderFooter() string {
-	hints := lipgloss.NewStyle().Faint(true).Render("q sair")
+	hints := lipgloss.NewStyle().Faint(true).Render("h/l mover · g/G inicio/fim · q sair")
 	summary := fmt.Sprintf("%d commits · %s", m.meta.TotalCommits, rangeLabel(m.meta))
 	return lipgloss.JoinVertical(lipgloss.Left,
 		rule(m.width),

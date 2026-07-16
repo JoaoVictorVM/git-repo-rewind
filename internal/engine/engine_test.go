@@ -179,6 +179,44 @@ func hashes(commits []extract.CommitEvent) []string {
 	return out
 }
 
+func TestNextAndPrevStepByCommit(t *testing.T) {
+	src := fakeSource{
+		events: []extract.Event{
+			extract.CommitEvent{Timestamp: day(1), Hash: "c1"},
+			extract.CommitEvent{Timestamp: day(2), Hash: "c2"},
+			extract.CommitEvent{Timestamp: day(3), Hash: "c3"},
+		},
+	}
+	engine := buildEngine(t, src)
+
+	if got := engine.Next(day(1)); !got.Equal(day(2)) {
+		t.Errorf("Next(day1) = %v, quer day2", got)
+	}
+	if got := engine.Next(day(2).Add(6 * time.Hour)); !got.Equal(day(3)) {
+		t.Errorf("Next entre commits = %v, quer day3", got)
+	}
+	if got := engine.Next(day(3)); !got.Equal(day(3)) {
+		t.Errorf("Next no ultimo deveria ficar parado, obteve %v", got)
+	}
+	if got := engine.Prev(day(3)); !got.Equal(day(2)) {
+		t.Errorf("Prev(day3) = %v, quer day2", got)
+	}
+	if got := engine.Prev(day(1)); !got.Equal(day(1)) {
+		t.Errorf("Prev no primeiro deveria ficar parado, obteve %v", got)
+	}
+}
+
+func TestNextPrevEmptyEngine(t *testing.T) {
+	engine := buildEngine(t, fakeSource{})
+	cursor := day(5)
+	if got := engine.Next(cursor); !got.Equal(cursor) {
+		t.Errorf("Next em motor vazio mudou o cursor: %v", got)
+	}
+	if got := engine.Prev(cursor); !got.Equal(cursor) {
+		t.Errorf("Prev em motor vazio mudou o cursor: %v", got)
+	}
+}
+
 func TestMetaPassthrough(t *testing.T) {
 	meta := extract.RepoMeta{Name: "demo", DefaultBranch: "main", TotalCommits: 1, FirstCommit: day(1), LastCommit: day(1)}
 	src := fakeSource{

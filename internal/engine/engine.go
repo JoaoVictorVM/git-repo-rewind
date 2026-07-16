@@ -104,6 +104,22 @@ func (e *Engine) Log(cursor time.Time, limit int) []extract.CommitEvent {
 	return recent
 }
 
+func (e *Engine) Next(cursor time.Time) time.Time {
+	idx := upperBound(e.timestamps, cursor)
+	if idx < len(e.timestamps) {
+		return e.timestamps[idx]
+	}
+	return cursor
+}
+
+func (e *Engine) Prev(cursor time.Time) time.Time {
+	idx := lowerBound(e.timestamps, cursor) - 1
+	if idx >= 0 {
+		return e.timestamps[idx]
+	}
+	return cursor
+}
+
 func (e *Engine) Meta() extract.RepoMeta {
 	return e.meta
 }
