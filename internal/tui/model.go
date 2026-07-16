@@ -17,19 +17,32 @@ import (
 var minimapRamp = []rune("▁▂▃▄▅▆▇█")
 
 type Model struct {
-	engine *engine.Engine
-	meta   extract.RepoMeta
-	cursor time.Time
-	width  int
-	height int
+	engine      *engine.Engine
+	meta        extract.RepoMeta
+	cursor      time.Time
+	width       int
+	height      int
+	addedAnim   counterAnim
+	deletedAnim counterAnim
+	animating   bool
 }
 
 func New(eng *engine.Engine) Model {
 	meta := eng.Meta()
-	return Model{engine: eng, meta: meta, cursor: meta.LastCommit}
+	return Model{
+		engine:      eng,
+		meta:        meta,
+		cursor:      meta.LastCommit,
+		addedAnim:   newCounterAnim(),
+		deletedAnim: newCounterAnim(),
+		animating:   meta.TotalCommits > 0,
+	}
 }
 
 func (m Model) Init() tea.Cmd {
+	if m.animating {
+		return tick()
+	}
 	return nil
 }
 
@@ -38,6 +51,8 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case tea.WindowSizeMsg:
 		m.width = msg.Width
 		m.height = msg.Height
+	case tickMsg:
+		return m.advanceAnimation()
 	case tea.KeyMsg:
 		switch msg.String() {
 		case "q", "ctrl+c":
@@ -45,6 +60,26 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 	}
 	return m, nil
+}
+
+func (m Model) advanceAnimation() (tea.Model, tea.Cmd) {
+	if !m.animating {
+		return m, nil
+	}
+
+	state := m.engine.At(m.cursor)
+	addTarget := float64(state.LinesAdded)
+	delTarget := float64(state.LinesDeleted)
+	m.addedAnim.update(addTarget)
+	m.deletedAnim.update(delTarget)
+
+	if m.addedAnim.settled(addTarget) && m.deletedAnim.settled(delTarget) {
+		m.addedAnim.snap(addTarget)
+		m.deletedAnim.snap(delTarget)
+		m.animating = false
+		return m, nil
+	}
+	return m, tick()
 }
 
 func (m Model) View() string {
@@ -84,7 +119,12 @@ func (m Model) renderBody(height int) string {
 			Align(lipgloss.Center, lipgloss.Center).
 			Render("repositorio sem commits ainda")
 	}
-	return scenes.Timeline{}.Render(m.engine, m.cursor, m.width, height)
+	counters := scenes.Counters{
+		Added:   m.addedAnim.value(),
+		Deleted: m.deletedAnim.value(),
+		Commits: m.engine.At(m.cursor).CommitCount,
+	}
+	return scenes.Timeline{}.Render(m.engine, m.cursor, counters, m.width, height)
 }
 
 func (m Model) renderFooter() string {

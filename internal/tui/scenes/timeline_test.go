@@ -57,7 +57,7 @@ func demoEngine(t *testing.T) *engine.Engine {
 
 func TestTimelineFillsDimensions(t *testing.T) {
 	eng := demoEngine(t)
-	view := scenes.Timeline{}.Render(eng, eng.Meta().LastCommit, 80, 20)
+	view := scenes.Timeline{}.Render(eng, eng.Meta().LastCommit, scenes.Counters{Added: 28, Deleted: 12, Commits: 2}, 80, 20)
 
 	lines := strings.Split(view, "\n")
 	if len(lines) != 20 {
@@ -72,7 +72,7 @@ func TestTimelineFillsDimensions(t *testing.T) {
 
 func TestTimelineShowsCountersAndLog(t *testing.T) {
 	eng := demoEngine(t)
-	view := scenes.Timeline{}.Render(eng, eng.Meta().LastCommit, 80, 20)
+	view := scenes.Timeline{}.Render(eng, eng.Meta().LastCommit, scenes.Counters{Added: 28, Deleted: 12, Commits: 2}, 80, 20)
 
 	for _, want := range []string{"+28", "removidas", "2 commits", "bbbbbbb", "Bruno", "segundo"} {
 		if !strings.Contains(view, want) {
@@ -86,7 +86,7 @@ func TestTimelineShowsCountersAndLog(t *testing.T) {
 
 func TestTimelineDrawsCursorLine(t *testing.T) {
 	eng := demoEngine(t)
-	view := scenes.Timeline{}.Render(eng, eng.Meta().FirstCommit, 80, 20)
+	view := scenes.Timeline{}.Render(eng, eng.Meta().FirstCommit, scenes.Counters{Added: 20, Deleted: 2, Commits: 1}, 80, 20)
 	if !strings.Contains(view, "│") {
 		t.Errorf("esperava linha vertical do cursor\n%s", view)
 	}

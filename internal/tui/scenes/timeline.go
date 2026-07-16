@@ -19,15 +19,21 @@ const (
 	authorWidth  = 14
 )
 
+type Counters struct {
+	Added   int
+	Deleted int
+	Commits int
+}
+
 type Timeline struct{}
 
-func (Timeline) Render(eng *engine.Engine, cursor time.Time, width, height int) string {
+func (Timeline) Render(eng *engine.Engine, cursor time.Time, counters Counters, width, height int) string {
 	if width < 1 || height < 1 {
 		return ""
 	}
 
-	counters := renderCounters(eng.At(cursor), width)
-	countersRows := lipgloss.Height(counters)
+	countersLine := renderCounters(counters, width)
+	countersRows := lipgloss.Height(countersLine)
 
 	logRows := clamp((height-countersRows-1)/3, minLogRows, maxLogRows)
 	chartRows := height - countersRows - logRows - 1
@@ -47,14 +53,14 @@ func (Timeline) Render(eng *engine.Engine, cursor time.Time, width, height int) 
 	)
 	log := renderLog(eng.Log(cursor, logRows), width, logRows)
 
-	view := lipgloss.JoinVertical(lipgloss.Left, counters, chart, rule(width), log)
+	view := lipgloss.JoinVertical(lipgloss.Left, countersLine, chart, rule(width), log)
 	return lipgloss.NewStyle().Width(width).Height(height).MaxHeight(height).Render(view)
 }
 
-func renderCounters(state engine.WorldState, width int) string {
-	added := lipgloss.NewStyle().Bold(true).Render(fmt.Sprintf("+%d", state.LinesAdded))
-	deleted := lipgloss.NewStyle().Bold(true).Render(fmt.Sprintf("−%d", state.LinesDeleted))
-	label := fmt.Sprintf("%s adicionadas   %s removidas   ·   %d commits", added, deleted, state.CommitCount)
+func renderCounters(counters Counters, width int) string {
+	added := lipgloss.NewStyle().Bold(true).Render(fmt.Sprintf("+%d", counters.Added))
+	deleted := lipgloss.NewStyle().Bold(true).Render(fmt.Sprintf("−%d", counters.Deleted))
+	label := fmt.Sprintf("%s adicionadas   %s removidas   ·   %d commits", added, deleted, counters.Commits)
 	return lipgloss.NewStyle().Width(width).Align(lipgloss.Center).Render(label)
 }
 
