@@ -26,6 +26,8 @@ type Model struct {
 	addedAnim   counterAnim
 	deletedAnim counterAnim
 	animating   bool
+	playing     bool
+	playGen     int
 }
 
 func New(eng *engine.Engine) Model {
@@ -54,10 +56,14 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.height = msg.Height
 	case tickMsg:
 		return m.advanceAnimation()
+	case playTickMsg:
+		return m.advancePlay(int(msg))
 	case tea.KeyMsg:
 		switch msg.String() {
 		case "q", "ctrl+c":
 			return m, tea.Quit
+		case " ", "space":
+			return m.togglePlay()
 		case "l", "right":
 			return m.moveCursor(m.engine.Step(m.cursor, m.granularity, true))
 		case "h", "left":
@@ -77,7 +83,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	return m, nil
 }
 
-func (m Model) moveCursor(to time.Time) (tea.Model, tea.Cmd) {
+func (m Model) moveCursor(to time.Time) (Model, tea.Cmd) {
 	if to.Equal(m.cursor) {
 		return m, nil
 	}
@@ -131,6 +137,9 @@ func (m Model) renderHeader() string {
 
 	title := lipgloss.NewStyle().Bold(true).Render("rewind · " + repoLabel(m.meta))
 	info := fmt.Sprintf("branch %s · cursor %s · passo %s", branch, date, m.granularity.Label())
+	if m.playing {
+		info += " · ▶"
+	}
 	bar := spread(title, info, m.width)
 	return lipgloss.JoinVertical(lipgloss.Left, bar, rule(m.width))
 }
@@ -155,7 +164,12 @@ func (m Model) renderBody(height int) string {
 }
 
 func (m Model) renderFooter() string {
-	hints := lipgloss.NewStyle().Faint(true).Render("h/l mover · +/- passo · g/G inicio/fim · q sair")
+	play := "play"
+	if m.playing {
+		play = "pausar"
+	}
+	hints := lipgloss.NewStyle().Faint(true).Render(
+		fmt.Sprintf("space %s · h/l mover · +/- passo · g/G extremos · q sair", play))
 	summary := fmt.Sprintf("%d commits · %s", m.meta.TotalCommits, rangeLabel(m.meta))
 	return lipgloss.JoinVertical(lipgloss.Left,
 		rule(m.width),
