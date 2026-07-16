@@ -9,6 +9,7 @@ import (
 
 	"github.com/JoaoVictorVM/git-repo-rewind/internal/engine"
 	"github.com/JoaoVictorVM/git-repo-rewind/internal/extract"
+	"github.com/JoaoVictorVM/git-repo-rewind/internal/theme"
 )
 
 const (
@@ -27,12 +28,12 @@ type Counters struct {
 
 type Timeline struct{}
 
-func (Timeline) Render(eng *engine.Engine, cursor time.Time, counters Counters, width, height int) string {
+func (Timeline) Render(eng *engine.Engine, cursor time.Time, counters Counters, th theme.Theme, width, height int) string {
 	if width < 1 || height < 1 {
 		return ""
 	}
 
-	countersLine := renderCounters(counters, width)
+	countersLine := renderCounters(counters, th, width)
 	countersRows := lipgloss.Height(countersLine)
 
 	logRows := clamp((height-countersRows-1)/3, minLogRows, maxLogRows)
@@ -49,22 +50,24 @@ func (Timeline) Render(eng *engine.Engine, cursor time.Time, counters Counters, 
 	chart := renderChart(
 		eng.Series(meta.FirstCommit, meta.LastCommit, width),
 		cursorColumn(cursor, meta.FirstCommit, meta.LastCommit, width),
-		width, chartRows,
+		th, width, chartRows,
 	)
-	log := renderLog(eng.Log(cursor, logRows), width, logRows)
+	log := renderLog(eng.Log(cursor, logRows), th, width, logRows)
+	separator := lipgloss.NewStyle().Foreground(th.Muted).Render(rule(width))
 
-	view := lipgloss.JoinVertical(lipgloss.Left, countersLine, chart, rule(width), log)
+	view := lipgloss.JoinVertical(lipgloss.Left, countersLine, chart, separator, log)
 	return lipgloss.NewStyle().Width(width).Height(height).MaxHeight(height).Render(view)
 }
 
-func renderCounters(counters Counters, width int) string {
-	added := lipgloss.NewStyle().Bold(true).Render(fmt.Sprintf("+%d", counters.Added))
-	deleted := lipgloss.NewStyle().Bold(true).Render(fmt.Sprintf("−%d", counters.Deleted))
-	label := fmt.Sprintf("%s adicionadas   %s removidas   ·   %d commits", added, deleted, counters.Commits)
+func renderCounters(counters Counters, th theme.Theme, width int) string {
+	added := lipgloss.NewStyle().Foreground(th.Added).Bold(true).Render(fmt.Sprintf("+%d", counters.Added))
+	deleted := lipgloss.NewStyle().Foreground(th.Deleted).Bold(true).Render(fmt.Sprintf("−%d", counters.Deleted))
+	commits := lipgloss.NewStyle().Foreground(th.Muted).Render(fmt.Sprintf("%d commits", counters.Commits))
+	label := fmt.Sprintf("%s adicionadas   %s removidas   ·   %s", added, deleted, commits)
 	return lipgloss.NewStyle().Width(width).Align(lipgloss.Center).Render(label)
 }
 
-func renderChart(series []engine.Bucket, cursor, width, height int) string {
+func renderChart(series []engine.Bucket, cursor int, th theme.Theme, width, height int) string {
 	if height < 1 {
 		height = 1
 	}
@@ -96,15 +99,19 @@ func renderChart(series []engine.Bucket, cursor, width, height int) string {
 
 	lines := make([]string, height)
 	for r := range grid {
-		lines[r] = string(grid[r])
+		base := th.Added
+		if r >= up {
+			base = th.Deleted
+		}
+		lines[r] = styleChartRow(grid[r], cursor, base, th.Accent)
 	}
 	return strings.Join(lines, "\n")
 }
 
-func renderLog(commits []extract.CommitEvent, width, rows int) string {
+func renderLog(commits []extract.CommitEvent, th theme.Theme, width, rows int) string {
 	lines := make([]string, 0, rows)
 	for _, commit := range commits {
-		lines = append(lines, renderLogLine(commit, width))
+		lines = append(lines, renderLogLine(commit, th, width))
 	}
 	for len(lines) < rows {
 		lines = append(lines, "")
@@ -112,14 +119,14 @@ func renderLog(commits []extract.CommitEvent, width, rows int) string {
 	return strings.Join(lines[:rows], "\n")
 }
 
-func renderLogLine(commit extract.CommitEvent, width int) string {
+func renderLogLine(commit extract.CommitEvent, th theme.Theme, width int) string {
 	hash := commit.Hash
 	if len(hash) > shortHashLen {
 		hash = hash[:shortHashLen]
 	}
-	prefix := fmt.Sprintf("%s  %-*s  ", hash, authorWidth, truncate(commit.Author, authorWidth))
+	author := truncate(commit.Author, authorWidth)
+	prefix := fmt.Sprintf("%s  %-*s  ", hash, authorWidth, author)
 	subject := truncate(firstLine(commit.Message), width-lipgloss.Width(prefix))
-	styled := lipgloss.NewStyle().Faint(true).Render(hash) +
-		fmt.Sprintf("  %-*s  ", authorWidth, truncate(commit.Author, authorWidth)) + subject
-	return styled
+	return lipgloss.NewStyle().Foreground(th.Muted).Render(hash) +
+		fmt.Sprintf("  %-*s  ", authorWidth, author) + subject
 }

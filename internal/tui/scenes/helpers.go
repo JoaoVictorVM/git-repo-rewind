@@ -21,6 +21,17 @@ func newGrid(width, height int) [][]rune {
 	return grid
 }
 
+func styleChartRow(cells []rune, cursor int, base, accent lipgloss.Color) string {
+	baseStyle := lipgloss.NewStyle().Foreground(base)
+	if cursor < 0 || cursor >= len(cells) {
+		return baseStyle.Render(string(cells))
+	}
+	accentStyle := lipgloss.NewStyle().Foreground(accent).Bold(true)
+	return baseStyle.Render(string(cells[:cursor])) +
+		accentStyle.Render(string(cells[cursor])) +
+		baseStyle.Render(string(cells[cursor+1:]))
+}
+
 func peaks(series []engine.Bucket) (int, int) {
 	add, del := 0, 0
 	for _, bucket := range series {

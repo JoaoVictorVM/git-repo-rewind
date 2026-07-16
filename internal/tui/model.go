@@ -11,6 +11,7 @@ import (
 
 	"github.com/JoaoVictorVM/git-repo-rewind/internal/engine"
 	"github.com/JoaoVictorVM/git-repo-rewind/internal/extract"
+	"github.com/JoaoVictorVM/git-repo-rewind/internal/theme"
 	"github.com/JoaoVictorVM/git-repo-rewind/internal/tui/scenes"
 )
 
@@ -23,6 +24,7 @@ type Model struct {
 	width       int
 	height      int
 	granularity engine.Granularity
+	theme       theme.Theme
 	addedAnim   counterAnim
 	deletedAnim counterAnim
 	animating   bool
@@ -36,6 +38,7 @@ func New(eng *engine.Engine) Model {
 		engine:      eng,
 		meta:        meta,
 		cursor:      meta.LastCommit,
+		theme:       theme.Default(),
 		addedAnim:   newCounterAnim(),
 		deletedAnim: newCounterAnim(),
 		animating:   meta.TotalCommits > 0,
@@ -135,13 +138,17 @@ func (m Model) renderHeader() string {
 		date = m.cursor.Format("2006-01-02 15:04")
 	}
 
-	title := lipgloss.NewStyle().Bold(true).Render("rewind · " + repoLabel(m.meta))
+	title := lipgloss.NewStyle().Foreground(m.theme.Accent).Bold(true).Render("rewind · " + repoLabel(m.meta))
 	info := fmt.Sprintf("branch %s · cursor %s · passo %s", branch, date, m.granularity.Label())
 	if m.playing {
-		info += " · ▶"
+		info += " · " + lipgloss.NewStyle().Foreground(m.theme.Accent).Render("▶")
 	}
 	bar := spread(title, info, m.width)
-	return lipgloss.JoinVertical(lipgloss.Left, bar, rule(m.width))
+	return lipgloss.JoinVertical(lipgloss.Left, bar, m.styledRule())
+}
+
+func (m Model) styledRule() string {
+	return lipgloss.NewStyle().Foreground(m.theme.Muted).Render(rule(m.width))
 }
 
 func (m Model) renderBody(height int) string {
@@ -160,7 +167,7 @@ func (m Model) renderBody(height int) string {
 		Deleted: m.deletedAnim.value(),
 		Commits: m.engine.At(m.cursor).CommitCount,
 	}
-	return scenes.Timeline{}.Render(m.engine, m.cursor, counters, m.width, height)
+	return scenes.Timeline{}.Render(m.engine, m.cursor, counters, m.theme, m.width, height)
 }
 
 func (m Model) renderFooter() string {
@@ -168,11 +175,12 @@ func (m Model) renderFooter() string {
 	if m.playing {
 		play = "pausar"
 	}
-	hints := lipgloss.NewStyle().Faint(true).Render(
+	muted := lipgloss.NewStyle().Foreground(m.theme.Muted)
+	hints := muted.Render(
 		fmt.Sprintf("space %s · h/l mover · +/- passo · g/G extremos · q sair", play))
-	summary := fmt.Sprintf("%d commits · %s", m.meta.TotalCommits, rangeLabel(m.meta))
+	summary := muted.Render(fmt.Sprintf("%d commits · %s", m.meta.TotalCommits, rangeLabel(m.meta)))
 	return lipgloss.JoinVertical(lipgloss.Left,
-		rule(m.width),
+		m.styledRule(),
 		m.renderMinimap(m.width),
 		spread(hints, summary, m.width),
 	)
@@ -182,8 +190,9 @@ func (m Model) renderMinimap(width int) string {
 	if width < 1 {
 		return ""
 	}
+	muted := lipgloss.NewStyle().Foreground(m.theme.Muted)
 	if m.meta.TotalCommits == 0 {
-		return lipgloss.NewStyle().Faint(true).Render(strings.Repeat("·", width))
+		return muted.Render(strings.Repeat("·", width))
 	}
 
 	counts := m.bucketCounts(width)
@@ -200,8 +209,8 @@ func (m Model) renderMinimap(width int) string {
 	}
 
 	col := cursorColumn(m.cursor, m.meta.FirstCommit, m.meta.LastCommit, width)
-	marker := lipgloss.NewStyle().Reverse(true).Render(string(cells[col]))
-	return string(cells[:col]) + marker + string(cells[col+1:])
+	marker := lipgloss.NewStyle().Foreground(m.theme.Accent).Bold(true).Render(string(cells[col]))
+	return muted.Render(string(cells[:col])) + marker + muted.Render(string(cells[col+1:]))
 }
 
 func (m Model) bucketCounts(width int) []int {
