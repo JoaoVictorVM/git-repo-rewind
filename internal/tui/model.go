@@ -25,6 +25,8 @@ type Model struct {
 	height      int
 	granularity engine.Granularity
 	theme       theme.Theme
+	themes      []theme.Theme
+	themeIndex  int
 	sceneList   []scenes.Scene
 	active      int
 	addedAnim   counterAnim
@@ -41,7 +43,8 @@ func New(eng *engine.Engine) Model {
 		engine: eng,
 		meta:   meta,
 		cursor: meta.LastCommit,
-		theme:  theme.Default(),
+		theme:  theme.Presets()[0],
+		themes: theme.Presets(),
 		sceneList: []scenes.Scene{
 			scenes.Timeline{},
 			scenes.Heatmap{},
@@ -92,6 +95,10 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return m, nil
 		case "o":
 			m.overview = !m.overview
+			return m, nil
+		case "T", "shift+t":
+			m.themeIndex = (m.themeIndex + 1) % len(m.themes)
+			m.theme = m.themes[m.themeIndex]
 			return m, nil
 		case "tab":
 			m.active = (m.active + 1) % len(m.sceneList)
@@ -260,7 +267,7 @@ func (m Model) renderFooter() string {
 	}
 	muted := lipgloss.NewStyle().Foreground(m.theme.Muted)
 	hints := muted.Render(
-		fmt.Sprintf("space %s · h/l mover · o overview · +/- passo · q sair", play))
+		fmt.Sprintf("space %s · h/l mover · o overview · T tema · q sair", play))
 	summary := muted.Render(fmt.Sprintf("%d commits · %s", m.meta.TotalCommits, rangeLabel(m.meta)))
 	return lipgloss.JoinVertical(lipgloss.Left,
 		m.styledRule(),
