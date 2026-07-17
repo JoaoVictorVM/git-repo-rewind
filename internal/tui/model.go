@@ -43,7 +43,7 @@ func New(eng *engine.Engine) Model {
 		theme:  theme.Default(),
 		sceneList: []scenes.Scene{
 			scenes.Timeline{},
-			scenes.Placeholder{Name: "Heatmap"},
+			scenes.Heatmap{},
 			scenes.Placeholder{Name: "Branches"},
 			scenes.Placeholder{Name: "Linguagens"},
 		},

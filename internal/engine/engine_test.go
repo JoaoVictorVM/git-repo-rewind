@@ -262,6 +262,36 @@ func TestNextPrevEmptyEngine(t *testing.T) {
 	}
 }
 
+func TestHeatmapAccumulatesByWeekdayHour(t *testing.T) {
+	c1 := time.Date(2026, 1, 5, 9, 0, 0, 0, time.UTC)
+	c2 := time.Date(2026, 1, 6, 14, 0, 0, 0, time.UTC)
+	c3 := time.Date(2026, 1, 5, 9, 30, 0, 0, time.UTC)
+	src := fakeSource{
+		events: []extract.Event{
+			extract.CommitEvent{Timestamp: c1, Hash: "c1"},
+			extract.CommitEvent{Timestamp: c2, Hash: "c2"},
+			extract.CommitEvent{Timestamp: c3, Hash: "c3"},
+		},
+	}
+	engine := buildEngine(t, src)
+
+	upToC3 := engine.Heatmap(c3)
+	if got := upToC3[int(c1.Weekday())][9]; got != 2 {
+		t.Errorf("celula (dia de c1, 9h) ate c3 = %d, quer 2", got)
+	}
+	if got := upToC3[int(c2.Weekday())][14]; got != 0 {
+		t.Errorf("celula de c2 nao deveria acender antes do cursor, obteve %d", got)
+	}
+
+	full := engine.Heatmap(c2)
+	if got := full[int(c2.Weekday())][14]; got != 1 {
+		t.Errorf("celula de c2 ate o fim = %d, quer 1", got)
+	}
+	if got := full[int(c1.Weekday())][9]; got != 2 {
+		t.Errorf("celula de c1/c3 ate o fim = %d, quer 2", got)
+	}
+}
+
 func TestMetaPassthrough(t *testing.T) {
 	meta := extract.RepoMeta{Name: "demo", DefaultBranch: "main", TotalCommits: 1, FirstCommit: day(1), LastCommit: day(1)}
 	src := fakeSource{

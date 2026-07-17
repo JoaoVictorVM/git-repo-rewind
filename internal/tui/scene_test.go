@@ -43,13 +43,13 @@ func TestPlaceholderSceneRenders(t *testing.T) {
 		t.Fatalf("timeline nao deveria ser um placeholder")
 	}
 
-	model, _ = press(model, "2")
+	model, _ = press(model, "3")
 	view := model.View()
-	if !strings.Contains(view, "Heatmap") {
-		t.Errorf("tab-strip deveria listar Heatmap\n%s", view)
+	if !strings.Contains(view, "Branches") {
+		t.Errorf("tab-strip deveria listar Branches\n%s", view)
 	}
 	if !strings.Contains(view, "em construção") {
-		t.Errorf("cena Heatmap deveria mostrar placeholder\n%s", view)
+		t.Errorf("cena Branches deveria mostrar placeholder\n%s", view)
 	}
 }
 

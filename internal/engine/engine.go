@@ -189,6 +189,16 @@ func (e *Engine) Prev(cursor time.Time) time.Time {
 	return cursor
 }
 
+func (e *Engine) Heatmap(cursor time.Time) [7][24]int {
+	var grid [7][24]int
+	count := upperBound(e.timestamps, cursor)
+	for i := 0; i < count; i++ {
+		t := e.commits[i].Timestamp
+		grid[int(t.Weekday())][t.Hour()]++
+	}
+	return grid
+}
+
 func (e *Engine) Meta() extract.RepoMeta {
 	return e.meta
 }
