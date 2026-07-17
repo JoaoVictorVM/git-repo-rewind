@@ -325,6 +325,37 @@ func TestLanguagesAggregatesNetLines(t *testing.T) {
 	}
 }
 
+func TestDAGStats(t *testing.T) {
+	src := fakeSource{
+		events: []extract.Event{
+			extract.CommitEvent{Timestamp: day(1), Hash: "root"},
+			extract.CommitEvent{Timestamp: day(2), Hash: "feat", Parents: []string{"root"}},
+			extract.CommitEvent{Timestamp: day(3), Hash: "main", Parents: []string{"root"}},
+			extract.CommitEvent{Timestamp: day(4), Hash: "merge", Parents: []string{"main", "feat"}},
+		},
+	}
+	engine := buildEngine(t, src)
+
+	full := engine.DAGStats(day(4))
+	if full.Commits != 4 {
+		t.Errorf("commits = %d, quer 4", full.Commits)
+	}
+	if full.Merges != 1 {
+		t.Errorf("merges = %d, quer 1", full.Merges)
+	}
+	if full.Tips != 1 {
+		t.Errorf("tips (pontas abertas) = %d, quer 1", full.Tips)
+	}
+
+	beforeMerge := engine.DAGStats(day(3))
+	if beforeMerge.Commits != 3 || beforeMerge.Merges != 0 {
+		t.Errorf("antes do merge = %+v, quer 3 commits e 0 merges", beforeMerge)
+	}
+	if beforeMerge.Tips != 2 {
+		t.Errorf("antes do merge deveria haver 2 pontas (main e feat), obteve %d", beforeMerge.Tips)
+	}
+}
+
 func TestMetaPassthrough(t *testing.T) {
 	meta := extract.RepoMeta{Name: "demo", DefaultBranch: "main", TotalCommits: 1, FirstCommit: day(1), LastCommit: day(1)}
 	src := fakeSource{

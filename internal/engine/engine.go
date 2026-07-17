@@ -222,6 +222,36 @@ func (e *Engine) Languages(cursor time.Time) []LanguageShare {
 	return shares
 }
 
+type DAGSummary struct {
+	Commits int
+	Merges  int
+	Tips    int
+}
+
+func (e *Engine) DAGStats(cursor time.Time) DAGSummary {
+	count := upperBound(e.timestamps, cursor)
+	subset := e.commits[:count]
+
+	isParent := make(map[string]bool)
+	merges := 0
+	for _, commit := range subset {
+		if len(commit.Parents) >= 2 {
+			merges++
+		}
+		for _, parent := range commit.Parents {
+			isParent[parent] = true
+		}
+	}
+
+	tips := 0
+	for _, commit := range subset {
+		if !isParent[commit.Hash] {
+			tips++
+		}
+	}
+	return DAGSummary{Commits: count, Merges: merges, Tips: tips}
+}
+
 func (e *Engine) Heatmap(cursor time.Time) [7][24]int {
 	var grid [7][24]int
 	count := upperBound(e.timestamps, cursor)

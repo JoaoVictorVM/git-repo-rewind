@@ -44,7 +44,7 @@ func New(eng *engine.Engine) Model {
 		sceneList: []scenes.Scene{
 			scenes.Timeline{},
 			scenes.Heatmap{},
-			scenes.Placeholder{Name: "Branches"},
+			scenes.Branches{},
 			scenes.Languages{},
 		},
 		addedAnim:   newCounterAnim(),

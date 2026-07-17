@@ -36,20 +36,17 @@ func TestNumberKeysSelectScene(t *testing.T) {
 	}
 }
 
-func TestPlaceholderSceneRenders(t *testing.T) {
+func TestSceneKeysSwitchBody(t *testing.T) {
 	var model tea.Model = threeCommitModel(t)
 
-	if strings.Contains(model.View(), "em construção") {
-		t.Fatalf("timeline nao deveria ser um placeholder")
+	model, _ = press(model, "3")
+	if !strings.Contains(model.View(), "árvore de commits") {
+		t.Errorf("tecla 3 deveria mostrar a cena de branches\n%s", model.View())
 	}
 
-	model, _ = press(model, "3")
-	view := model.View()
-	if !strings.Contains(view, "Branches") {
-		t.Errorf("tab-strip deveria listar Branches\n%s", view)
-	}
-	if !strings.Contains(view, "em construção") {
-		t.Errorf("cena Branches deveria mostrar placeholder\n%s", view)
+	model, _ = press(model, "2")
+	if !strings.Contains(model.View(), "atividade") {
+		t.Errorf("tecla 2 deveria mostrar o heatmap\n%s", model.View())
 	}
 }
 
