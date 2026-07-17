@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/JoaoVictorVM/git-repo-rewind/internal/extract"
+	"github.com/JoaoVictorVM/git-repo-rewind/internal/stats"
 )
 
 type LanguageShare struct {
@@ -260,6 +261,11 @@ func (e *Engine) Heatmap(cursor time.Time) [7][24]int {
 		grid[int(t.Weekday())][t.Hour()]++
 	}
 	return grid
+}
+
+func (e *Engine) Summary(cursor time.Time) stats.Summary {
+	count := upperBound(e.timestamps, cursor)
+	return stats.Compute(e.commits[:count])
 }
 
 func (e *Engine) Meta() extract.RepoMeta {

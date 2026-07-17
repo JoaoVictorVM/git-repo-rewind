@@ -35,6 +35,7 @@ type Model struct {
 	playing     bool
 	playGen     int
 	overview    bool
+	showStats   bool
 }
 
 func New(eng *engine.Engine) Model {
@@ -95,6 +96,9 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return m, nil
 		case "o":
 			m.overview = !m.overview
+			return m, nil
+		case "s":
+			m.showStats = !m.showStats
 			return m, nil
 		case "T", "shift+t":
 			m.themeIndex = (m.themeIndex + 1) % len(m.themes)
@@ -204,6 +208,9 @@ func (m Model) renderBody(height int) string {
 			Align(lipgloss.Center, lipgloss.Center).
 			Render("repositorio sem commits ainda")
 	}
+	if m.showStats {
+		return scenes.StatsCard{}.Render(m.frame(m.width, height))
+	}
 	if m.overview {
 		return m.renderOverview(height)
 	}
@@ -267,7 +274,7 @@ func (m Model) renderFooter() string {
 	}
 	muted := lipgloss.NewStyle().Foreground(m.theme.Muted)
 	hints := muted.Render(
-		fmt.Sprintf("space %s · h/l mover · o overview · T tema · q sair", play))
+		fmt.Sprintf("space %s · h/l mover · o overview · s resumo · T tema · q sair", play))
 	summary := muted.Render(fmt.Sprintf("%d commits · %s", m.meta.TotalCommits, rangeLabel(m.meta)))
 	return lipgloss.JoinVertical(lipgloss.Left,
 		m.styledRule(),
