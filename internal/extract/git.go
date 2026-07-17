@@ -8,6 +8,7 @@ import (
 	"sort"
 	"strings"
 
+	"github.com/go-enry/go-enry/v2"
 	"github.com/go-git/go-git/v5"
 	"github.com/go-git/go-git/v5/plumbing"
 	"github.com/go-git/go-git/v5/plumbing/object"
@@ -92,11 +93,16 @@ func toCommitEvent(commit *object.Commit) (CommitEvent, error) {
 	}
 
 	added, deleted := 0, 0
-	files := make([]string, 0, len(stats))
+	files := make([]FileChange, 0, len(stats))
 	for _, stat := range stats {
 		added += stat.Addition
 		deleted += stat.Deletion
-		files = append(files, stat.Name)
+		files = append(files, FileChange{
+			Path:         stat.Name,
+			Language:     detectLanguage(stat.Name),
+			LinesAdded:   stat.Addition,
+			LinesDeleted: stat.Deletion,
+		})
 	}
 
 	parents := make([]string, 0, commit.NumParents())
@@ -115,6 +121,13 @@ func toCommitEvent(commit *object.Commit) (CommitEvent, error) {
 		Files:        files,
 		Parents:      parents,
 	}, nil
+}
+
+func detectLanguage(path string) string {
+	if enry.IsVendor(path) {
+		return ""
+	}
+	return enry.GetLanguage(path, nil)
 }
 
 func sortChronologically(commits []CommitEvent) {

@@ -7,6 +7,13 @@ type Event interface {
 	isEvent()
 }
 
+type FileChange struct {
+	Path         string
+	Language     string
+	LinesAdded   int
+	LinesDeleted int
+}
+
 type CommitEvent struct {
 	Timestamp    time.Time
 	Hash         string
@@ -15,7 +22,7 @@ type CommitEvent struct {
 	Message      string
 	LinesAdded   int
 	LinesDeleted int
-	Files        []string
+	Files        []FileChange
 	Parents      []string
 }
 

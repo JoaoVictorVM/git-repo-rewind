@@ -81,8 +81,11 @@ func TestGitExtractorEmitsCommitsChronologically(t *testing.T) {
 	if c2.LinesAdded != 2 || c2.LinesDeleted != 0 {
 		t.Errorf("commit 2: +%d -%d, quer +2 -0", c2.LinesAdded, c2.LinesDeleted)
 	}
-	if len(c1.Files) != 1 || c1.Files[0] != "a.txt" {
-		t.Errorf("commit 1 files = %v, quer [a.txt]", c1.Files)
+	if len(c1.Files) != 1 || c1.Files[0].Path != "a.txt" {
+		t.Errorf("commit 1 files = %v, quer path a.txt", c1.Files)
+	}
+	if c1.Files[0].LinesAdded != 3 {
+		t.Errorf("commit 1 file delta = +%d, quer +3", c1.Files[0].LinesAdded)
 	}
 	if c1.Author != "Ana Dev" || c1.Email != "ana@example.com" {
 		t.Errorf("autoria = %q <%q>", c1.Author, c1.Email)
@@ -95,6 +98,34 @@ func TestGitExtractorEmitsCommitsChronologically(t *testing.T) {
 	}
 	if len(c2.Parents) != 1 || c2.Parents[0] != h1.String() {
 		t.Errorf("commit 2 parents = %v, quer [%s]", c2.Parents, h1)
+	}
+}
+
+func TestGitExtractorDetectsLanguage(t *testing.T) {
+	dir := t.TempDir()
+	repo, err := git.PlainInit(dir, false)
+	if err != nil {
+		t.Fatalf("PlainInit: %v", err)
+	}
+	wt, err := repo.Worktree()
+	if err != nil {
+		t.Fatalf("Worktree: %v", err)
+	}
+
+	when := time.Date(2026, 2, 1, 10, 0, 0, 0, time.UTC)
+	writeAndCommit(t, wt, dir, "main.go", "package main\n\nfunc main() {}\n", "codigo go", when)
+
+	extractor, err := NewGitExtractor(dir)
+	if err != nil {
+		t.Fatalf("NewGitExtractor: %v", err)
+	}
+
+	commits := drainEvents(t, extractor)
+	if len(commits) != 1 || len(commits[0].Files) != 1 {
+		t.Fatalf("esperava 1 commit com 1 arquivo, obteve %+v", commits)
+	}
+	if lang := commits[0].Files[0].Language; lang != "Go" {
+		t.Errorf("linguagem detectada = %q, quer Go", lang)
 	}
 }
 

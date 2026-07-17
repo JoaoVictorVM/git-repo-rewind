@@ -8,6 +8,11 @@ import (
 	"github.com/JoaoVictorVM/git-repo-rewind/internal/extract"
 )
 
+type LanguageShare struct {
+	Name  string
+	Lines int
+}
+
 type WorldState struct {
 	Cursor       time.Time
 	LinesAdded   int
@@ -187,6 +192,34 @@ func (e *Engine) Prev(cursor time.Time) time.Time {
 		return e.timestamps[idx]
 	}
 	return cursor
+}
+
+func (e *Engine) Languages(cursor time.Time) []LanguageShare {
+	totals := make(map[string]int)
+	count := upperBound(e.timestamps, cursor)
+	for i := 0; i < count; i++ {
+		for _, file := range e.commits[i].Files {
+			if file.Language == "" {
+				continue
+			}
+			totals[file.Language] += file.LinesAdded - file.LinesDeleted
+		}
+	}
+
+	shares := make([]LanguageShare, 0, len(totals))
+	for name, lines := range totals {
+		if lines <= 0 {
+			continue
+		}
+		shares = append(shares, LanguageShare{Name: name, Lines: lines})
+	}
+	sort.Slice(shares, func(i, j int) bool {
+		if shares[i].Lines == shares[j].Lines {
+			return shares[i].Name < shares[j].Name
+		}
+		return shares[i].Lines > shares[j].Lines
+	})
+	return shares
 }
 
 func (e *Engine) Heatmap(cursor time.Time) [7][24]int {

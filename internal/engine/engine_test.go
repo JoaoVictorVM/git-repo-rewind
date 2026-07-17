@@ -292,6 +292,39 @@ func TestHeatmapAccumulatesByWeekdayHour(t *testing.T) {
 	}
 }
 
+func TestLanguagesAggregatesNetLines(t *testing.T) {
+	src := fakeSource{
+		events: []extract.Event{
+			extract.CommitEvent{Timestamp: day(1), Hash: "c1", Files: []extract.FileChange{
+				{Path: "a.go", Language: "Go", LinesAdded: 100, LinesDeleted: 0},
+				{Path: "r.md", Language: "Markdown", LinesAdded: 20, LinesDeleted: 0},
+			}},
+			extract.CommitEvent{Timestamp: day(2), Hash: "c2", Files: []extract.FileChange{
+				{Path: "a.go", Language: "Go", LinesAdded: 10, LinesDeleted: 5},
+				{Path: "b.py", Language: "Python", LinesAdded: 3, LinesDeleted: 3},
+				{Path: "bin", Language: "", LinesAdded: 999, LinesDeleted: 0},
+			}},
+		},
+	}
+	engine := buildEngine(t, src)
+
+	atC1 := engine.Languages(day(1))
+	if len(atC1) != 2 || atC1[0].Name != "Go" || atC1[0].Lines != 100 {
+		t.Fatalf("no c1 esperava Go liderando com 100, obteve %+v", atC1)
+	}
+
+	full := engine.Languages(day(2))
+	if len(full) != 2 {
+		t.Fatalf("esperava 2 linguagens (Python liquido 0 e sem-linguagem sao descartados), obteve %+v", full)
+	}
+	if full[0].Name != "Go" || full[0].Lines != 105 {
+		t.Errorf("Go liquido = %+v, quer 105", full[0])
+	}
+	if full[1].Name != "Markdown" || full[1].Lines != 20 {
+		t.Errorf("segunda linguagem = %+v, quer Markdown 20", full[1])
+	}
+}
+
 func TestMetaPassthrough(t *testing.T) {
 	meta := extract.RepoMeta{Name: "demo", DefaultBranch: "main", TotalCommits: 1, FirstCommit: day(1), LastCommit: day(1)}
 	src := fakeSource{
