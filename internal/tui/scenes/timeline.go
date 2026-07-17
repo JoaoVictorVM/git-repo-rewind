@@ -26,14 +26,32 @@ type Counters struct {
 	Commits int
 }
 
+type Frame struct {
+	Engine   *engine.Engine
+	Cursor   time.Time
+	Counters Counters
+	Theme    theme.Theme
+	Width    int
+	Height   int
+}
+
+type Scene interface {
+	Title() string
+	Render(f Frame) string
+}
+
 type Timeline struct{}
 
-func (Timeline) Render(eng *engine.Engine, cursor time.Time, counters Counters, th theme.Theme, width, height int) string {
+func (Timeline) Title() string { return "Timeline" }
+
+func (Timeline) Render(f Frame) string {
+	width, height := f.Width, f.Height
 	if width < 1 || height < 1 {
 		return ""
 	}
+	th := f.Theme
 
-	countersLine := renderCounters(counters, th, width)
+	countersLine := renderCounters(f.Counters, th, width)
 	countersRows := lipgloss.Height(countersLine)
 
 	logRows := clamp((height-countersRows-1)/3, minLogRows, maxLogRows)
@@ -46,13 +64,13 @@ func (Timeline) Render(eng *engine.Engine, cursor time.Time, counters Counters, 
 		logRows = 0
 	}
 
-	meta := eng.Meta()
+	meta := f.Engine.Meta()
 	chart := renderChart(
-		eng.Series(meta.FirstCommit, meta.LastCommit, width),
-		cursorColumn(cursor, meta.FirstCommit, meta.LastCommit, width),
+		f.Engine.Series(meta.FirstCommit, meta.LastCommit, width),
+		cursorColumn(f.Cursor, meta.FirstCommit, meta.LastCommit, width),
 		th, width, chartRows,
 	)
-	log := renderLog(eng.Log(cursor, logRows), th, width, logRows)
+	log := renderLog(f.Engine.Log(f.Cursor, logRows), th, width, logRows)
 	separator := lipgloss.NewStyle().Foreground(th.Muted).Render(rule(width))
 
 	view := lipgloss.JoinVertical(lipgloss.Left, countersLine, chart, separator, log)

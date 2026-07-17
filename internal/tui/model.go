@@ -25,6 +25,8 @@ type Model struct {
 	height      int
 	granularity engine.Granularity
 	theme       theme.Theme
+	sceneList   []scenes.Scene
+	active      int
 	addedAnim   counterAnim
 	deletedAnim counterAnim
 	animating   bool
@@ -35,10 +37,16 @@ type Model struct {
 func New(eng *engine.Engine) Model {
 	meta := eng.Meta()
 	return Model{
-		engine:      eng,
-		meta:        meta,
-		cursor:      meta.LastCommit,
-		theme:       theme.Default(),
+		engine: eng,
+		meta:   meta,
+		cursor: meta.LastCommit,
+		theme:  theme.Default(),
+		sceneList: []scenes.Scene{
+			scenes.Timeline{},
+			scenes.Placeholder{Name: "Heatmap"},
+			scenes.Placeholder{Name: "Branches"},
+			scenes.Placeholder{Name: "Linguagens"},
+		},
 		addedAnim:   newCounterAnim(),
 		deletedAnim: newCounterAnim(),
 		animating:   meta.TotalCommits > 0,
@@ -80,6 +88,14 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return m, nil
 		case "-", "_":
 			m.granularity = m.granularity.Finer()
+			return m, nil
+		case "tab":
+			m.active = (m.active + 1) % len(m.sceneList)
+			return m, nil
+		case "1", "2", "3", "4":
+			if idx := int(msg.String()[0] - '1'); idx < len(m.sceneList) {
+				m.active = idx
+			}
 			return m, nil
 		}
 	}
@@ -144,7 +160,19 @@ func (m Model) renderHeader() string {
 		info += " · " + lipgloss.NewStyle().Foreground(m.theme.Accent).Render("▶")
 	}
 	bar := spread(title, info, m.width)
-	return lipgloss.JoinVertical(lipgloss.Left, bar, m.styledRule())
+	return lipgloss.JoinVertical(lipgloss.Left, bar, m.renderTabs(), m.styledRule())
+}
+
+func (m Model) renderTabs() string {
+	labels := make([]string, len(m.sceneList))
+	for i, scene := range m.sceneList {
+		style := lipgloss.NewStyle().Foreground(m.theme.Muted)
+		if i == m.active {
+			style = lipgloss.NewStyle().Foreground(m.theme.Accent).Bold(true)
+		}
+		labels[i] = style.Render(fmt.Sprintf("%d %s", i+1, scene.Title()))
+	}
+	return strings.Join(labels, "   ")
 }
 
 func (m Model) styledRule() string {
@@ -162,12 +190,19 @@ func (m Model) renderBody(height int) string {
 			Align(lipgloss.Center, lipgloss.Center).
 			Render("repositorio sem commits ainda")
 	}
-	counters := scenes.Counters{
-		Added:   m.addedAnim.value(),
-		Deleted: m.deletedAnim.value(),
-		Commits: m.engine.At(m.cursor).CommitCount,
+	frame := scenes.Frame{
+		Engine: m.engine,
+		Cursor: m.cursor,
+		Counters: scenes.Counters{
+			Added:   m.addedAnim.value(),
+			Deleted: m.deletedAnim.value(),
+			Commits: m.engine.At(m.cursor).CommitCount,
+		},
+		Theme:  m.theme,
+		Width:  m.width,
+		Height: height,
 	}
-	return scenes.Timeline{}.Render(m.engine, m.cursor, counters, m.theme, m.width, height)
+	return m.sceneList[m.active].Render(frame)
 }
 
 func (m Model) renderFooter() string {

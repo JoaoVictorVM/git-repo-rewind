@@ -56,9 +56,13 @@ func demoEngine(t *testing.T) *engine.Engine {
 	return eng
 }
 
+func frame(eng *engine.Engine, cursor time.Time, counters scenes.Counters) scenes.Frame {
+	return scenes.Frame{Engine: eng, Cursor: cursor, Counters: counters, Theme: theme.Default(), Width: 80, Height: 20}
+}
+
 func TestTimelineFillsDimensions(t *testing.T) {
 	eng := demoEngine(t)
-	view := scenes.Timeline{}.Render(eng, eng.Meta().LastCommit, scenes.Counters{Added: 28, Deleted: 12, Commits: 2}, theme.Default(), 80, 20)
+	view := scenes.Timeline{}.Render(frame(eng, eng.Meta().LastCommit, scenes.Counters{Added: 28, Deleted: 12, Commits: 2}))
 
 	lines := strings.Split(view, "\n")
 	if len(lines) != 20 {
@@ -73,7 +77,7 @@ func TestTimelineFillsDimensions(t *testing.T) {
 
 func TestTimelineShowsCountersAndLog(t *testing.T) {
 	eng := demoEngine(t)
-	view := scenes.Timeline{}.Render(eng, eng.Meta().LastCommit, scenes.Counters{Added: 28, Deleted: 12, Commits: 2}, theme.Default(), 80, 20)
+	view := scenes.Timeline{}.Render(frame(eng, eng.Meta().LastCommit, scenes.Counters{Added: 28, Deleted: 12, Commits: 2}))
 
 	for _, want := range []string{"+28", "removidas", "2 commits", "bbbbbbb", "Bruno", "segundo"} {
 		if !strings.Contains(view, want) {
@@ -87,7 +91,7 @@ func TestTimelineShowsCountersAndLog(t *testing.T) {
 
 func TestTimelineDrawsCursorLine(t *testing.T) {
 	eng := demoEngine(t)
-	view := scenes.Timeline{}.Render(eng, eng.Meta().FirstCommit, scenes.Counters{Added: 20, Deleted: 2, Commits: 1}, theme.Default(), 80, 20)
+	view := scenes.Timeline{}.Render(frame(eng, eng.Meta().FirstCommit, scenes.Counters{Added: 20, Deleted: 2, Commits: 1}))
 	if !strings.Contains(view, "│") {
 		t.Errorf("esperava linha vertical do cursor\n%s", view)
 	}
