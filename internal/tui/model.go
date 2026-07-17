@@ -32,6 +32,7 @@ type Model struct {
 	animating   bool
 	playing     bool
 	playGen     int
+	overview    bool
 }
 
 func New(eng *engine.Engine) Model {
@@ -88,6 +89,9 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return m, nil
 		case "-", "_":
 			m.granularity = m.granularity.Finer()
+			return m, nil
+		case "o":
+			m.overview = !m.overview
 			return m, nil
 		case "tab":
 			m.active = (m.active + 1) % len(m.sceneList)
@@ -156,6 +160,9 @@ func (m Model) renderHeader() string {
 
 	title := lipgloss.NewStyle().Foreground(m.theme.Accent).Bold(true).Render("rewind · " + repoLabel(m.meta))
 	info := fmt.Sprintf("branch %s · cursor %s · passo %s", branch, date, m.granularity.Label())
+	if m.overview {
+		info += " · " + lipgloss.NewStyle().Foreground(m.theme.Accent).Render("grid")
+	}
 	if m.playing {
 		info += " · " + lipgloss.NewStyle().Foreground(m.theme.Accent).Render("▶")
 	}
@@ -190,7 +197,14 @@ func (m Model) renderBody(height int) string {
 			Align(lipgloss.Center, lipgloss.Center).
 			Render("repositorio sem commits ainda")
 	}
-	frame := scenes.Frame{
+	if m.overview {
+		return m.renderOverview(height)
+	}
+	return m.sceneList[m.active].Render(m.frame(m.width, height))
+}
+
+func (m Model) frame(width, height int) scenes.Frame {
+	return scenes.Frame{
 		Engine: m.engine,
 		Cursor: m.cursor,
 		Counters: scenes.Counters{
@@ -199,10 +213,44 @@ func (m Model) renderBody(height int) string {
 			Commits: m.engine.At(m.cursor).CommitCount,
 		},
 		Theme:  m.theme,
-		Width:  m.width,
+		Width:  width,
 		Height: height,
 	}
-	return m.sceneList[m.active].Render(frame)
+}
+
+func (m Model) renderOverview(height int) string {
+	leftW := (m.width - 1) / 2
+	rightW := m.width - 1 - leftW
+	topH := (height - 1) / 2
+	bottomH := height - 1 - topH
+
+	top := lipgloss.JoinHorizontal(lipgloss.Top,
+		m.renderCell(m.sceneList[0], leftW, topH),
+		m.verticalDivider(topH),
+		m.renderCell(m.sceneList[1], rightW, topH),
+	)
+	bottom := lipgloss.JoinHorizontal(lipgloss.Top,
+		m.renderCell(m.sceneList[2], leftW, bottomH),
+		m.verticalDivider(bottomH),
+		m.renderCell(m.sceneList[3], rightW, bottomH),
+	)
+	return lipgloss.JoinVertical(lipgloss.Left, top, m.styledRule(), bottom)
+}
+
+func (m Model) renderCell(scene scenes.Scene, width, height int) string {
+	title := lipgloss.NewStyle().Foreground(m.theme.Accent).Bold(true).Render(scene.Title())
+	body := scene.Render(m.frame(width, height-1))
+	cell := lipgloss.JoinVertical(lipgloss.Left, title, body)
+	return lipgloss.NewStyle().Width(width).Height(height).MaxHeight(height).Render(cell)
+}
+
+func (m Model) verticalDivider(height int) string {
+	style := lipgloss.NewStyle().Foreground(m.theme.Muted)
+	lines := make([]string, height)
+	for i := range lines {
+		lines[i] = style.Render("│")
+	}
+	return strings.Join(lines, "\n")
 }
 
 func (m Model) renderFooter() string {
@@ -212,7 +260,7 @@ func (m Model) renderFooter() string {
 	}
 	muted := lipgloss.NewStyle().Foreground(m.theme.Muted)
 	hints := muted.Render(
-		fmt.Sprintf("space %s · h/l mover · +/- passo · g/G extremos · q sair", play))
+		fmt.Sprintf("space %s · h/l mover · o overview · +/- passo · q sair", play))
 	summary := muted.Render(fmt.Sprintf("%d commits · %s", m.meta.TotalCommits, rangeLabel(m.meta)))
 	return lipgloss.JoinVertical(lipgloss.Left,
 		m.styledRule(),
