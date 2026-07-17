@@ -74,9 +74,19 @@ func (e *Engine) Series(from, to time.Time, buckets int) []Bucket {
 	span := to.Sub(from)
 	previous := lowerBound(e.timestamps, from)
 
+	if span <= 0 {
+		end := upperBound(e.timestamps, to)
+		series[buckets-1] = Bucket{
+			Added:   e.addPrefix[end] - e.addPrefix[previous],
+			Deleted: e.delPrefix[end] - e.delPrefix[previous],
+			Commits: end - previous,
+		}
+		return series
+	}
+
 	for i := 0; i < buckets; i++ {
 		boundary := to
-		if span > 0 && i < buckets-1 {
+		if i < buckets-1 {
 			frac := float64(i+1) / float64(buckets)
 			boundary = from.Add(time.Duration(float64(span) * frac))
 		}

@@ -134,6 +134,26 @@ func TestSeriesBucketsDeltas(t *testing.T) {
 	}
 }
 
+func TestSeriesSingleInstant(t *testing.T) {
+	src := fakeSource{
+		events: []extract.Event{
+			extract.CommitEvent{Timestamp: day(1), Hash: "c1", LinesAdded: 7, LinesDeleted: 2},
+		},
+	}
+	engine := buildEngine(t, src)
+
+	got := engine.Series(day(1), day(1), 4)
+	if len(got) != 4 {
+		t.Fatalf("esperava 4 buckets, obteve %d", len(got))
+	}
+	if got[3].Added != 7 || got[3].Deleted != 2 || got[3].Commits != 1 {
+		t.Errorf("commit unico deveria cair no ultimo bucket, obteve %+v", got[3])
+	}
+	if got[0].Commits != 0 {
+		t.Errorf("buckets anteriores deveriam ficar vazios, bucket0 = %+v", got[0])
+	}
+}
+
 func TestSeriesIncludesBoundaryCommits(t *testing.T) {
 	src := fakeSource{
 		events: []extract.Event{

@@ -36,6 +36,7 @@ type Model struct {
 	playGen     int
 	overview    bool
 	showStats   bool
+	showHelp    bool
 }
 
 func New(eng *engine.Engine) Model {
@@ -99,6 +100,9 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return m, nil
 		case "s":
 			m.showStats = !m.showStats
+			return m, nil
+		case "?":
+			m.showHelp = !m.showHelp
 			return m, nil
 		case "T", "shift+t":
 			m.themeIndex = (m.themeIndex + 1) % len(m.themes)
@@ -201,12 +205,16 @@ func (m Model) renderBody(height int) string {
 	if height < 1 {
 		height = 1
 	}
+	if m.showHelp {
+		return m.renderHelp(height)
+	}
 	if m.meta.TotalCommits == 0 {
 		return lipgloss.NewStyle().
+			Foreground(m.theme.Muted).
 			Width(m.width).
 			Height(height).
 			Align(lipgloss.Center, lipgloss.Center).
-			Render("repositorio sem commits ainda")
+			Render("repositorio sem commits — nada para explorar ainda")
 	}
 	if m.showStats {
 		return scenes.StatsCard{}.Render(m.frame(m.width, height))
@@ -258,6 +266,42 @@ func (m Model) renderCell(scene scenes.Scene, width, height int) string {
 	return lipgloss.NewStyle().Width(width).Height(height).MaxHeight(height).Render(cell)
 }
 
+func (m Model) renderHelp(height int) string {
+	key := lipgloss.NewStyle().Foreground(m.theme.Accent).Bold(true)
+	desc := lipgloss.NewStyle().Foreground(m.theme.Muted)
+	row := func(keys, action string) string {
+		return key.Render(fmt.Sprintf("%-12s", keys)) + desc.Render(action)
+	}
+
+	lines := []string{
+		key.Render("atalhos"),
+		"",
+		row("h/l  ←/→", "mover o cursor"),
+		row("g / G", "início / fim da história"),
+		row("+ / -", "granularidade (commit/dia/semana)"),
+		row("space", "play/pause do autoplay"),
+		row("Tab 1–4", "trocar de cena"),
+		row("o", "modo overview (grid 2×2)"),
+		row("s", "card de resumo"),
+		row("Shift+T", "trocar de tema"),
+		row("?", "mostrar/esconder esta ajuda"),
+		row("q  Ctrl+C", "sair"),
+	}
+
+	box := lipgloss.NewStyle().
+		Border(lipgloss.RoundedBorder()).
+		BorderForeground(m.theme.Accent).
+		Padding(0, 2).
+		Render(lipgloss.JoinVertical(lipgloss.Left, lines...))
+
+	return lipgloss.NewStyle().
+		Width(m.width).
+		Height(height).
+		MaxHeight(height).
+		Align(lipgloss.Center, lipgloss.Center).
+		Render(box)
+}
+
 func (m Model) verticalDivider(height int) string {
 	style := lipgloss.NewStyle().Foreground(m.theme.Muted)
 	lines := make([]string, height)
@@ -274,7 +318,7 @@ func (m Model) renderFooter() string {
 	}
 	muted := lipgloss.NewStyle().Foreground(m.theme.Muted)
 	hints := muted.Render(
-		fmt.Sprintf("space %s · h/l mover · o overview · s resumo · T tema · q sair", play))
+		fmt.Sprintf("space %s · h/l mover · ? ajuda · q sair", play))
 	summary := muted.Render(fmt.Sprintf("%d commits · %s", m.meta.TotalCommits, rangeLabel(m.meta)))
 	return lipgloss.JoinVertical(lipgloss.Left,
 		m.styledRule(),
